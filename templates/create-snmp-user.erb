@@ -1,0 +1,1 @@
+service <%= @service_name %> stop ; sleep 5 ; echo "<%= @cmd %>" >><%= @var_snmp %>/<%= @daemon %>.conf && touch <%= @var_snmp %>/<%= @title %>-<%= @daemon -%>

@@ -1,19 +1,22 @@
-source ENV['GEM_SOURCE'] || "https://rubygems.org"
+source ENV['GEM_SOURCE'] || 'https://rubygems.org'
 
 group :development, :unit_tests do
-  gem "rake", "~> 10.0"
+  gem 'rake', '~> 10.0'
   gem 'rspec', '~> 2.0',                      :require => false
   gem 'rspec-puppet', '>= 2.1.0',             :require => false
   gem 'puppetlabs_spec_helper',               :require => false
   gem 'puppet-lint', '>= 1.1.0',              :require => false
   gem 'simplecov',                            :require => false
   gem 'puppet_facts',                         :require => false
-  gem 'json',                                 :require => false
+  gem 'json',      '< 2.0.0',                :require => false if RUBY_VERSION < '2.0.0'
+  gem 'json_pure', '<= 2.0.1',                :require => false if RUBY_VERSION < '2.0.0'
   gem 'metadata-json-lint', '>= 0.0.4',       :require => false
   gem 'puppet-lint-unquoted_string-check',    :require => false
   gem 'puppet-lint-empty_string-check',       :require => false
   gem 'puppet-lint-leading_zero-check',       :require => false
   gem 'puppet-lint-variable_contains_upcase', :require => false
+  gem 'rainbow', '<= 1.99.2',                  :require => false if RUBY_VERSION < '2.0.0'
+  gem 'rubocop', '0.40.0'
 end
 
 if facterversion = ENV['FACTER_GEM_VERSION']
