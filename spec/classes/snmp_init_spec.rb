@@ -23,12 +23,7 @@ describe 'snmp', :type => 'class' do
       describe "on #{map['family']}[#{map['os']}]:#{map['version']}"  do
         let(:params) {{}}
         let :facts do
-          {
-            :osfamily               => 'RedHat',
-            :operatingsystem        => 'RedHat',
-            :operatingsystemrelease => '5.9',
-            :fqdn                   => 'myhost.localdomain'
-          }
+          map['facts']
         end
 
         it { should_not contain_class('snmp::client') }
@@ -37,37 +32,46 @@ describe 'snmp', :type => 'class' do
           should contain_package('snmpd')
             .with(
               :ensure => 'present',
-              :name   => 'net-snmp'
+              :name   => map['snmpd_package'] ? map['snmpd_package'] : 'net-snmp',
             )
           should contain_file('var-net-snmp')
             .with(
               :ensure  => 'directory',
-              :mode    => '0700',
-              :owner   => 'root',
-              :group   => 'root',
-              :path    => '/var/net-snmp',
+              :mode    => map['var_perm'],
+              :owner   => map['var_owner'] ? map['var_owner'] : 'root',
+              :group   => map['var_group'] ? map['var_group'] : 'root',
+              :path    => map['var_path'],
               :require => 'Package[snmpd]'
             )
           should contain_file('snmpd.conf')
             .with(
               :ensure  => 'present',
-              :mode    => '0644',
-              :owner   => 'root',
-              :group   => 'root',
-              :path    => '/etc/snmp/snmpd.conf',
+              :mode    => map['snmpd_conf_mode'] ? map['snmpd_conf_mode'] : '0644',
+              :owner   => (map['snmpd_conf_owner'] ?
+                           map['snmpd_conf_onwer'] : 'root'),
+              :group   => (map['snmpd_conf_group'] ?
+                           map['snmpd_conf_group'] : 'root'),
+              :path    => (map['snmpd_conf_file'] ?
+                           map['snmpd_conf_file'] : '/etc/snmp/snmpd.conf'),
               :require => 'Package[snmpd]',
               :notify  => 'Service[snmpd]'
             )
-          should contain_file('snmpd.sysconfig')
-            .with(
-              :ensure  => 'present',
-              :mode    => '0644',
-              :owner   => 'root',
-              :group   => 'root',
-              :path    => '/etc/sysconfig/snmpd.options',
-              :require => 'Package[snmpd]',
-              :notify  => 'Service[snmpd]'
-            )
+
+          if map['snmpd_sysconf']
+            should contain_file('snmpd.sysconfig')
+              .with(
+                :ensure  => 'present',
+                :mode    => '0644',
+                :owner   => 'root',
+                :group   => 'root',
+                :path    => map['snmpd_sysconf'],
+                :require => 'Package[snmpd]',
+                :notify  => 'Service[snmpd]'
+              ).with_content(/#{map['options']}/)
+          else
+            should_not contain_file('snmpd.sysconf')
+          end
+
           should contain_service('snmpd')
             .with(
               :ensure     => 'running',
@@ -77,35 +81,57 @@ describe 'snmp', :type => 'class' do
               :hasrestart => true,
               :require    => [ 'Package[snmpd]', 'File[var-net-snmp]', ]
             )
-          should contain_file('snmptrapd.conf')
-            .with(
-              :ensure  => 'present',
-              :mode    => '0644',
-              :owner   => 'root',
-              :group   => 'root',
-              :path    => '/etc/snmp/snmptrapd.conf',
-              :require => 'Package[snmpd]',
-              :notify  => 'Service[snmptrapd]'
-            )
-          should contain_file('snmptrapd.sysconfig')
-            .with(
-              :ensure  => 'present',
-              :mode    => '0644',
-              :owner   => 'root',
-              :group   => 'root',
-              :path    => '/etc/sysconfig/snmptrapd.options',
-              :require => 'Package[snmpd]',
-              :notify  => 'Service[snmptrapd]'
-            )
-          should contain_service('snmptrapd')
-            .with(
-              :ensure     => 'stopped',
-              :name       => 'snmptrapd',
-              :enable     => false,
-              :hasstatus  => true,
-              :hasrestart => true,
-              :require    => [ 'Package[snmpd]', 'File[var-net-snmp]', ]
-            )
+
+          if map['snmptrapd_conf']
+            should contain_file('snmptrapd.conf')
+              .with(
+                :ensure  => 'present',
+                :mode    => map['snmpdtrapd_conf_mode'] ? map['snmpdtrapd_conf_mode'] : '0644',
+              :owner   => (map['trapd_conf_owner'] ?
+                           map['trapd_conf_onwer'] : 'root'),
+              :group   => (map['trapd_conf_group'] ?
+                           map['trapd_conf_group'] : 'root'),
+                :path    => map['snmptrapd_conf'],
+                :require => 'Package[snmpd]',
+                :notify  => 'Service[%s]' % (map['trapd_service_name'] ?
+                                             map['trapd_service_name'] : 'snmptrapd')
+              )
+          else
+            should_not contain_file('snmptrapd.conf')
+          end
+
+          if map['snmptrap_sysconf']
+            should contain_file('snmptrapd.sysconfig')
+              .with(
+                :ensure  => 'present',
+                :mode    => '0644',
+                :owner   => 'root',
+                :group   => 'root',
+                :path    => map['snmptrap_sysconf'],
+                :require => 'Package[snmpd]',
+                :notify  => 'Service[%s]' % (map['trapd_service_name'] ?
+                                             map['trapd_service_name'] : 'snmptrapd')
+              )
+          else
+            should_not contain_file('snmptrapd.sysconfig')
+          end
+
+          if map['has_service_trapd']
+            should contain_service('snmptrapd')
+              .with(
+                :ensure     => 'stopped',
+                :name       => 'snmptrapd',
+                :enable     => false,
+                :hasstatus  => true,
+                :hasrestart => true,
+                :require    => (map['trapd_exec'] ?
+                                [ 'Package[snmpd]', 'File[var-net-snmp]',
+                                  map['trapd_exec'] ] :
+                                [ 'Package[snmpd]', 'File[var-net-snmp]', ])
+              )
+          else
+            should_not contain_service('snmptrapd')
+          end
         end
         #
         # TODO add more contents for File[snmpd.conf]
@@ -129,12 +155,6 @@ describe 'snmp', :type => 'class' do
           ])
         end
 
-        it 'should contain File[snmpd.sysconfig] with default OPTIONS' do
-          verify_contents(catalogue, 'snmpd.sysconfig', [
-            'OPTIONS="-Lsd -Lf /dev/null -p /var/run/snmpd.pid -a"',
-          ])
-        end
-
         # TODO add more contents for File[snmptrapd.conf]
         it 'should contain File[snmptrapd.conf] with correct contents' do
           verify_contents(catalogue, 'snmptrapd.conf', [
@@ -144,10 +164,12 @@ describe 'snmp', :type => 'class' do
           ])
         end
 
-        it 'should contain File[snmptrapd.sysconfig] with contents OPTIONS' do
-          verify_contents(catalogue, 'snmptrapd.sysconfig', [
-            'OPTIONS="-Lsd -p /var/run/snmptrapd.pid"',
-          ])
+        if map['snmptrap_sysconf']
+          it 'should contain File[snmptrapd.sysconfig] with contents OPTIONS' do
+            verify_contents(catalogue, 'snmptrapd.sysconfig', [
+              'OPTIONS="-Lsd -p /var/run/snmptrapd.pid"',
+            ])
+          end
         end
       end
     end
@@ -155,9 +177,10 @@ describe 'snmp', :type => 'class' do
 
   context 'on a supported osfamily (RedHat), custom parameters' do
     let :facts do {
-      :osfamily               => 'RedHat',
-      :operatingsystem        => 'RedHat',
-      :operatingsystemrelease => '6.4'
+      :osfamily                  => 'RedHat',
+      :operatingsystem           => 'RedHat',
+      :operatingsystemrelease    => '6.4',
+      :operatingsystemmajrelease => '6',
     }
     end
 

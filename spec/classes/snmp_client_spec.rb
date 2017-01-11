@@ -23,27 +23,38 @@ describe 'snmp::client', :type => 'class' do
     OPERATING_SYSTEM_MAP.each do |os, map|
       describe "on #{map['family']}[#{map['os']}]:#{map['version']}" do
         let :facts do
-          {
-            :osfamily               => map['family'],
-            :operatingsystem        => map['os'],
-            :operatingsystemrelease => map['version']
-          }
+          map['facts']
         end
         let(:params) {{}}
         it do
-          should contain_package('snmp-client')
-            .with(
-              :ensure => 'present',
-              :name   => 'net-snmp-utils'
-            )
+
+          if map['snmp_client_package']
+            should contain_package('snmp-client')
+              .with(
+                :ensure => 'present',
+                :name   => map['snmp_client_package']
+              )
+            #required_pkg = "Package['snmp-client']{:name => '#{map['snmp_client_package']}'}"
+            required_pkg = 'Package[snmp-client]'
+          else
+            should_not contain_package('snmp-client')
+            required_pkg = nil
+          end
+
+          if map['client_config']
+            path = map['client_config']
+          else
+            path = '/etc/snmp/snmp.conf'
+          end
+
           should contain_file('snmp.conf')
             .with(
               :ensure  => 'present',
               :mode    => '0644',
               :owner   => 'root',
               :group   => 'root',
-              :path    => '/etc/snmp/snmp.conf',
-              :require => 'Package[snmp-client]'
+              :path    => path,
+              :require => required_pkg
             )
         end
       end
@@ -55,6 +66,7 @@ describe 'snmp::client', :type => 'class' do
       {
         :osfamily               => 'RedHat',
         :operatingsystem        => 'RedHat',
+        :operatingsystemmajrelease => '6',
         :operatingsystemrelease => '6.4'
       }
     end
