@@ -256,7 +256,7 @@
 #
 class snmp (
   $agentaddress            = $snmp::params::agentaddress,
-  $snmptrapdaddr           = $snmp::params::snmptrapdaddr,
+  $snmptrapdaddr           = $snmp::params::trapdaddr,
   $ro_community            = $snmp::params::ro_community,
   $ro_community6           = $snmp::params::ro_community6,
   $rw_community            = $snmp::params::rw_community,
@@ -283,10 +283,10 @@ class snmp (
   $trap_forwards           = $snmp::params::trap_forwards,
   $snmptrapd_config        = $snmp::params::snmptrapd_config,
   $install_client          = $snmp::params::install_client,
-  $manage_client           = $snmp::params::safe_manage_client,
+  $manage_client           = $snmp::params::manage_client,
   $snmp_config             = $snmp::params::snmp_config,
   $ensure                  = $snmp::params::ensure,
-  $autoupgrade             = $snmp::params::safe_autoupgrade,
+  $autoupgrade             = $snmp::params::autoupgrade,
   $package_name            = $snmp::params::package_name,
   $snmpd_options           = $snmp::params::snmpd_options,
   $service_config_perms    = $snmp::params::service_config_perms,
