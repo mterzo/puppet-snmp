@@ -8,7 +8,8 @@ describe 'snmp::snmpv3_user', :type => 'define' do
     let :facts do {
       :osfamily               => 'RedHat',
       :operatingsystem        => 'CentOS',
-      :operatingsystemrelease => '6.4'
+      :operatingsystemrelease => '6.4',
+      :operatingsystemmajrelease => '6'
     }
     end
 
@@ -66,11 +67,8 @@ describe 'snmp::snmpv3_user', :type => 'define' do
 
   OPERATING_SYSTEM_MAP.each do |os, map|
     context "on #{map['family']}[#{map['os']}]:#{map['version']}"  do
-      let :facts do {
-        :osfamily               => map['family'],
-        :operatingsystem        => map['os'],
-        :operatingsystemrelease => map['version']
-      }
+      let :facts do
+        map['facts']
       end
 
       describe 'with default settings' do
@@ -79,17 +77,20 @@ describe 'snmp::snmpv3_user', :type => 'define' do
           :authpass => 'myauthpass',
         }
         end
+        user = 'myDEFAULTuser'
 
         it do
-          cmd = 'service snmpd stop ; sleep 5 ; '                     +
-                'echo "createUser myDEFAULTuser SHA \"myauthpass\"" ' +
-                '>>/var/lib/net-snmp/snmpd.conf && '                  +
-                "touch #{map['var_path']}myDEFAULTuser-snmpd"
+          cmd = 'service snmpd stop ; sleep 5 ; '
+          cmd += 'echo "createUser %s %s \"%s\"" ' % [user, 'SHA',
+                                                      'myauthpass']
+          cmd += '>>%s/snmpd.conf && touch %s/%s-snmpd' % [map['var_path'],
+                                                           map['var_path'],
+                                                           user]
 
-          should contain_exec('create-snmpv3-user-myDEFAULTuser')
+          should contain_exec("create-snmpv3-user-#{user}")
             .with(
               :command => cmd,
-              :creates => "#{map['var_path']}/myDEFAULTuser-snmpd",
+              :creates => "#{map['var_path']}/#{user}-snmpd",
               :require => [ 'Package[snmpd]', 'File[var-net-snmp]' ],
               :before  => 'Service[snmpd]'
             )
@@ -107,11 +108,22 @@ describe 'snmp::snmpv3_user', :type => 'define' do
         }
         end
 
+        user = 'myALLuser'
+
         it do
-          should contain_exec('create-snmpv3-user-myALLuser')
+          cmd = 'service snmpd stop ; sleep 5 ; '
+          cmd += 'echo "createUser %s %s \"%s\" %s \"%s\"" ' % [user,'MD5',
+                                                                'myauthpass',
+                                                                'DES',
+                                                                'myprivpass']
+          cmd += '>>%s/snmpd.conf && touch %s/%s-snmpd' % [map['var_path'],
+                                                           map['var_path'],
+                                                           user]
+
+          should contain_exec("create-snmpv3-user-#{user}")
             .with(
-              :command => 'service snmpd stop ; sleep 5 ; echo "createUser myALLuser MD5 \"myauthpass\" DES \"myprivpass\"" >>/var/lib/net-snmp/snmpd.conf && touch /var/lib/net-snmp/myALLuser-snmpd',
-              :creates => '/var/lib/net-snmp/myALLuser-snmpd',
+              :command => cmd,
+              :creates => "#{map['var_path']}/#{user}-snmpd",
               :require => [ 'Package[snmpd]', 'File[var-net-snmp]' ],
               :before  => 'Service[snmpd]'
             )
@@ -127,13 +139,29 @@ describe 'snmp::snmpv3_user', :type => 'define' do
         }
         end
 
+        user = 'myTRAPuser'
+
         it do
-          should contain_exec('create-snmpv3-user-myTRAPuser')
+
+          if map['family'] == 'Debian'
+            service = 'snmpd'
+          else
+            service = 'snmptrapd'
+          end
+
+
+          cmd = 'service %s stop ; sleep 5 ; ' % service
+          cmd += 'echo "createUser %s %s \"%s\"" ' % [user,'SHA', 'myauthpass']
+          cmd += '>>%s/%s.conf && touch %s/%s-%s' % [map['var_path'],
+                                                     'snmptrapd',
+                                                     map['var_path'], user,
+                                                     'snmptrapd']
+          should contain_exec("create-snmpv3-user-#{user}")
             .with(
-              :command => 'service snmptrapd stop ; sleep 5 ; echo "createUser myTRAPuser SHA \"myauthpass\"" >>/var/lib/net-snmp/snmptrapd.conf && touch /var/lib/net-snmp/myTRAPuser-snmptrapd',
-              :creates => '/var/lib/net-snmp/myTRAPuser-snmptrapd',
+              :command => cmd,
+              :creates => "#{map['var_path']}/#{user}-snmptrapd",
               :require => [ 'Package[snmpd]', 'File[var-net-snmp]' ],
-              :before  => 'Service[snmptrapd]'
+              :before  => "Service[#{service}]"
             )
         end
       end
